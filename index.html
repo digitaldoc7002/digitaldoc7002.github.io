@@ -1,141 +1,110 @@
 <!DOCTYPE html>
  
 <html>
- 
-<head>
- 
-    <title>Take or select photo(s) and upload</title>
- 
+  <head>
     <script type="text/javascript">
- 
-      function fileSelected() {
- 
-        var count = document.getElementById('fileToUpload').files.length;
- 
-              document.getElementById('details').innerHTML = "";
- 
-              for (var index = 0; index < count; index ++)
- 
-              {
- 
-                     var file = document.getElementById('fileToUpload').files[index];
- 
-                     var fileSize = 0;
- 
-                     if (file.size > 1024 * 1024)
- 
-                            fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
- 
-                     else
- 
-                            fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB';
- 
-                     document.getElementById('details').innerHTML += 'Name: ' + file.name + '<br>Size: ' + fileSize + '<br>Type: ' + file.type;
- 
-                     document.getElementById('details').innerHTML += '<p>';
- 
-              }
- 
+      // Your Client ID can be retrieved from your project in the Google
+      // Developer Console, https://console.developers.google.com
+      var CLIENT_ID = '<YOUR_CLIENT_ID>';
+
+      var SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly'];
+
+      /**
+       * Check if current user has authorized this application.
+       */
+      function checkAuth() {
+        gapi.auth.authorize(
+          {
+            'client_id': '400674201800-6bemvg5nsetn9ucoqljl21cj1t58q25q.apps.googleusercontent.com',
+            'scope': SCOPES.join(' '),
+            'immediate': true
+          }, handleAuthResult);
       }
- 
-      function uploadFile() {
- 
-        var fd = new FormData();
- 
-              var count = document.getElementById('fileToUpload').files.length;
- 
-              for (var index = 0; index < count; index ++)
- 
-              {
- 
-                     var file = document.getElementById('fileToUpload').files[index];
- 
-                     fd.append('myFile', file);
- 
-              }
- 
-        var xhr = new XMLHttpRequest();
- 
-        xhr.upload.addEventListener("progress", uploadProgress, false);
- 
-        xhr.addEventListener("load", uploadComplete, false);
- 
-        xhr.addEventListener("error", uploadFailed, false);
- 
-        xhr.addEventListener("abort", uploadCanceled, false);
- 
-        xhr.open("POST", "savetofile.php");
- 
-        xhr.send(fd);
- 
-      }
- 
-      function uploadProgress(evt) {
- 
-        if (evt.lengthComputable) {
- 
-          var percentComplete = Math.round(evt.loaded * 100 / evt.total);
- 
-          document.getElementById('progress').innerHTML = percentComplete.toString() + '%';
- 
+
+      /**
+       * Handle response from authorization server.
+       *
+       * @param {Object} authResult Authorization result.
+       */
+      function handleAuthResult(authResult) {
+        var authorizeDiv = document.getElementById('authorize-div');
+        if (authResult && !authResult.error) {
+          // Hide auth UI, then load client library.
+          authorizeDiv.style.display = 'none';
+          loadDriveApi();
+        } else {
+          // Show auth UI, allowing the user to initiate authorization by
+          // clicking authorize button.
+          authorizeDiv.style.display = 'inline';
         }
- 
-        else {
- 
-          document.getElementById('progress').innerHTML = 'unable to compute';
- 
-        }
- 
       }
- 
-      function uploadComplete(evt) {
- 
-        /* This event is raised when the server send back a response */
- 
-        alert(evt.target.responseText);
- 
+
+      /**
+       * Initiate auth flow in response to user clicking authorize button.
+       *
+       * @param {Event} event Button click event.
+       */
+      function handleAuthClick(event) {
+        gapi.auth.authorize(
+          {client_id: CLIENT_ID, scope: SCOPES, immediate: false},
+          handleAuthResult);
+        return false;
       }
- 
-      function uploadFailed(evt) {
- 
-        alert("There was an error attempting to upload the file.");
- 
+
+      /**
+       * Load Drive API client library.
+       */
+      function loadDriveApi() {
+        gapi.client.load('drive', 'v3', listFiles);
       }
- 
-      function uploadCanceled(evt) {
- 
-        alert("The upload has been canceled by the user or the browser dropped the connection.");
- 
+
+      /**
+       * Print files.
+       */
+      function listFiles() {
+        var request = gapi.client.drive.files.list({
+            'pageSize': 10,
+            'fields': "nextPageToken, files(id, name)"
+          });
+
+          request.execute(function(resp) {
+            appendPre('Files:');
+            var files = resp.files;
+            if (files && files.length > 0) {
+              for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                appendPre(file.name + ' (' + file.id + ')');
+              }
+            } else {
+              appendPre('No files found.');
+            }
+          });
       }
- 
+
+      /**
+       * Append a pre element to the body containing the given message
+       * as its text node.
+       *
+       * @param {string} message Text to be placed in pre element.
+       */
+      function appendPre(message) {
+        var pre = document.getElementById('output');
+        var textContent = document.createTextNode(message + '\n');
+        pre.appendChild(textContent);
+      }
+
     </script>
- 
-</head>
- 
-<body>
- 
-  <form id="form1" enctype="multipart/form-data" method="post" action="Upload.aspx">
- 
-    <div>
- 
-      <label for="fileToUpload">Take or select photo(s)</label><br />
- 
-      <input type="file" name="fileToUpload" id="fileToUpload" onchange="fileSelected();" accept="image/*" capture="camera" />
- 
+    <script src="https://apis.google.com/js/client.js?onload=checkAuth">
+    </script>
+  </head>
+  <body>
+    <div id="authorize-div" style="display: none">
+      <span>Authorize access to Drive API</span>
+      <!--Button for the user to click to initiate auth sequence -->
+      <button id="authorize-button" onclick="handleAuthClick(event)">
+        Authorize
+      </button>
     </div>
- 
-    <div id="details"></div>
- 
-    <div>
- 
-      <input type="button" onclick="uploadFile()" value="Upload" />
- 
-    </div>
- 
-    <div id="progress"></div>
- 
-  </form>
- 
-</body>
- 
+    <pre id="output"></pre>
+  </body>
 </html>
